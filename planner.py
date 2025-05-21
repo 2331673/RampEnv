@@ -9,8 +9,8 @@ class Planner:
         # 对应merge_env.py中 ends = [150, 80, 80, 150]
         # jk交汇点x = ends[0] = 150，kb交汇点x = ends[0] + ends[1] = 230
         self.merging_zone = (150, 230)
-        self.MAINLINE_MIN_SPEED = 40.0/3.6  # 60km/h
-        self.RAMP_MIN_SPEED = 10/3.6    # 20km/h
+        self.MAINLINE_MIN_SPEED = 50.0/3.6  # 50km/h
+        self.RAMP_MIN_SPEED = 20/3.6    # 20km/h
 
     def correct_vehicle_state(self, vehicle, env):
         vehicle_id = id(vehicle)
@@ -93,7 +93,7 @@ class Planner:
             # 预测两车到达汇入点的时间（考虑加速度过程）
             ramp_time = self.predict_arrival_time(ramp_dist, ramp_state['speed'], self.RAMP_MIN_SPEED, RAMP_A_MAX)   # 匝道加速
             main_time = self.predict_arrival_time(main_dist, main_state['speed'], self.MAINLINE_MIN_SPEED, MAIN_A_MIN)  # 主路减速
-            time_gap = 1.5 if ramp_state['position'] >= self.merging_zone[0] else 1.5
+            time_gap = 1.0 if ramp_state['position'] >= self.merging_zone[0] else 1.0
             if (main_time - ramp_time) > time_gap:
                 # 匝道车辆以最大加速度提速，但不超过限速
                 ramp_target_speed = ramp_state['speed'] + RAMP_A_MAX * ramp_time
@@ -116,15 +116,30 @@ class Planner:
         mainline_vehicles = [v for v in merging_sequence if v.lane_index[0] in ["a", "b", "c"]]
         ramp_vehicles = [v for v in merging_sequence if v.lane_index[0] in ["j", "k"]]
 
-        # 1. 所有主路车辆初始期望速度为80km/h，匝道为40km/h
         planned_speeds = {}
+        dt = 0.1  # 仿真步长
+
         for vehicle in merging_sequence:
             vehicle_id = id(vehicle)
+            # 主干道车辆
             if vehicle.lane_index[0] in ["a", "b", "c"]:
-                target_speed = 60/3.6  # 主路80km/h
+                speed = vehicle.speed
+                acc_max = min(getattr(vehicle, "ACC_MAX", 2.0), getattr(vehicle, "COMFORT_ACC_MAX", 2.0))
+                acc_min = max(-getattr(vehicle, "ACC_MAX", 2.0), getattr(vehicle, "COMFORT_ACC_MIN", -2.0))
+                if speed < 70/3.6:
+                    target_speed = speed + acc_max * dt
+                else:
+                    target_speed = speed + acc_min * dt
                 min_speed = self.MAINLINE_MIN_SPEED
+            # 匝道车辆
             elif vehicle.lane_index[0] in ["j", "k"]:
-                target_speed = 30/3.6  # 匝道40km/h
+                speed = vehicle.speed
+                acc_max = min(getattr(vehicle, "ACC_MAX", 2.0), getattr(vehicle, "COMFORT_ACC_MAX", 2.0))
+                acc_min = max(-getattr(vehicle, "ACC_MAX", 2.0), getattr(vehicle, "COMFORT_ACC_MIN", -2.0))
+                if speed < 30/3.6:
+                    target_speed = speed + acc_max * dt
+                else:
+                    target_speed = speed + acc_min * dt
                 min_speed = self.RAMP_MIN_SPEED
             else:
                 target_speed = 30.0
@@ -132,7 +147,6 @@ class Planner:
             planned_speeds[vehicle_id] = max(min_speed, min(35.0, target_speed))
 
         # 2. 协调控制，只和主干道上序号为1的车辆交互
-        # 找到距离汇入点最近的主路车辆
         merging_point = self.merging_zone[1]
         mainline_sorted = sorted(
             [v for v in mainline_vehicles if v.position[0] < merging_point],

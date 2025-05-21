@@ -8,7 +8,7 @@ class MergeEnvV1(MergeEnv):
         road = self.road
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
         # 匝道ego车，速度范围30~40km/h
-        ego_speed = self.np_random.uniform(25, 35) / 3.6
+        ego_speed = self.np_random.uniform(28, 35) / 3.6
         ego_vehicle = other_vehicles_type(
             road, road.network.get_lane(("j", "k", 0)).position(140, 0), speed=ego_speed
         )
@@ -19,7 +19,7 @@ class MergeEnvV1(MergeEnv):
         for position in main_positions:
             lane = road.network.get_lane(("a", "b", self.np_random.integers(2)))
             pos = lane.position(position + self.np_random.uniform(-5, 5), 0)
-            speed = self.np_random.uniform(55, 65) / 3.6  # 70~90 km/h
+            speed = self.np_random.uniform(65, 75) / 3.6  # 70~90 km/h
             road.vehicles.append(other_vehicles_type(road, pos, speed=speed))
         self.vehicle = ego_vehicle
 
