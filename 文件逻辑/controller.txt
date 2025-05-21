@@ -1,0 +1,27 @@
+controller.py 主要实现了 RoadsideController 路侧控制器的整体逻辑，集成了通信延迟、车辆管理、轨迹/速度/间距规划、控制执行和历史记录等功能模块。其核心流程如下：
+
+1. 初始化
+- RoadsideController 初始化时，保存环境 env，并根据仿真频率计算时间步长 dt。
+- 实例化各功能模块：DelayModel（通信延迟）、VehicleManager（车辆管理）、Planner（规划）、Executor（控制执行）、History（历史记录）。
+- 初始化运行时数据，包括合流排序队列、规划速度/间距、实际速度/间距等。
+
+2. update() 主流程
+- 每次调用 update()，时间步自增，计算当前仿真时间 current_time。
+- 步骤1：调用 delay_model.update_delay_estimation()，根据车辆位置和历史数据，更新每辆车的通信延迟估计。
+- 步骤2：调用 vehicle_manager.detect_vehicles()，检测主路、匝道和 ego 车辆。
+- 步骤3：将所有车辆按预计到达汇入区的时间排序，得到 merging_sequence。
+- 步骤4：调用 planner.plan_trajectory()，为排序后的车辆规划目标速度和安全间距，返回 planned_speeds 和 planned_gaps。
+- 步骤5：调用 executor.apply_control()，根据规划结果调整车辆 target_speed，实现加减速、避撞等控制。
+- 步骤6：调用 history.record()，记录当前时刻的规划/实际速度、间距及误差等历史数据。
+
+3. verify_vehicle_states()
+- 用于调试，调用 vehicle_manager 检查并打印主路、匝道和 ego 车辆的数量和 ID。
+
+各功能模块说明：
+- DelayModel：负责模拟和估计车辆与控制器之间的通信延迟。
+- VehicleManager：负责车辆检测、前车查找、主路相关车辆筛选等。
+- Planner：负责延迟修正、跟驰安全距离计算、轨迹/速度/间距规划。
+- Executor：负责根据规划结果调整车辆 target_speed，实现加减速、避撞等。
+- History：负责记录和分析速度/间距误差等历史数据。
+
+整体流程为：延迟估计 → 车辆检测 → 排序 → 轨迹/速度/间距规划 → 控制执行 → 历史记录与误差分析，实现了路侧对车辆的智能协同控制。

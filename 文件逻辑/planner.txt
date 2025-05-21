@@ -1,0 +1,47 @@
+planner.py 主要实现了 Planner 类，用于路侧控制器的轨迹、速度和安全间距规划，核心逻辑如下：
+
+1. 初始化
+- Planner 初始化时，保存 delay_model（通信延迟模型），并定义延迟估计区、控制区、汇入区的坐标范围。
+
+2. correct_vehicle_state(vehicle, env)
+- 根据通信延迟修正车辆状态。
+- 获取车辆 id、当前位置、速度。
+- 对于 IDMVehicle，调用其 acceleration 方法计算加速度；否则用 _last_acceleration 属性。
+- 获取车辆的通信延迟 delay。
+- 用运动学公式修正车辆位置和速度（考虑延迟影响）。
+- 返回修正后的 position、speed、acceleration。
+
+3. calculate_safe_distance(follower_speed, leader_speed)
+- 计算安全跟车距离。
+- 采用公式：safe_distance = min_gap + follower_speed * time_gap + max(0, follower_speed - leader_speed) * 1.0
+- min_gap=8.0，time_gap=1.8，速度差项用于防止追尾。
+
+4. plan_trajectory(merging_sequence, env)
+- 为所有车辆规划目标速度和安全间距，考虑通信延迟。
+- 遍历合流排序队列 merging_sequence，对每辆车：
+  - 修正车辆状态。
+  - 默认目标速度为 30 m/s。
+  - 如果有前车（leader），则：
+    - 修正前车状态。
+    - 计算安全距离 safe_distance。
+    - 计算实际距离 actual_distance。
+    - 若实际距离 < 0.8*安全距离，目标速度设为前车速度的 95%（减速）。
+    - 若实际距离 > 1.2*安全距离，目标速度设为前车速度的 105%（加速，最大不超过 35）。
+    - 否则目标速度等于前车速度。
+    - 记录车辆对的安全距离到 planned_gaps。
+  - 目标速度限制在 25~35 m/s。
+  - 记录目标速度到 planned_speeds。
+- 返回所有车辆的 planned_speeds 和 planned_gaps。
+
+5. calculate_merging_acceleration(vehicle, leader, follower, distance_to_merge)
+- 计算匝道车汇入主路所需加速度。
+- 预测合流时刻 leader、follower 的位置。
+- 计算理想插入位置（基于 follower 未来位置、车长和安全距离）。
+- 计算最大允许插入位置（基于 leader 未来位置和安全距离）。
+- 理想插入位置不能超过最大允许位置。
+- 计算理想末速度 required_end_speed。
+- 返回达到该末速度所需的平均加速度。
+
+整体流程：
+- Planner 负责根据车辆当前状态和通信延迟，动态规划每辆车的目标速度和安全间距，确保合流安全与效率。
+- 规划结果用于控制器下发给车辆，指导其加减速和间距调整，实现智能协同控制。
