@@ -46,7 +46,8 @@ def run_simulation():
     print(f"Controller found {len(ramp_vehicles)} ramp vehicles")
     print(f"Controller ego ID: {id(controller_ego) if controller_ego else None}")
 
-    frames = []
+    frames = []   
+    
     fig, axes = plt.subplots(3, 1, figsize=(12, 12))
 
     for step in range(400):
