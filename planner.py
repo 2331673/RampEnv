@@ -130,7 +130,7 @@ class Planner:
                     target_speed = speed + acc_max * dt
                 else:
                     target_speed = speed + acc_min * dt
-                min_speed = self.MAINLINE_MIN_SPEED
+
             # 匝道车辆
             elif vehicle.lane_index[0] in ["j", "k"]:
                 speed = vehicle.speed
@@ -140,11 +140,11 @@ class Planner:
                     target_speed = speed + acc_max * dt
                 else:
                     target_speed = speed + acc_min * dt
-                min_speed = self.RAMP_MIN_SPEED
+
             else:
                 target_speed = 30.0
-                min_speed = 0
-            planned_speeds[vehicle_id] = max(min_speed, min(35.0, target_speed))
+
+            planned_speeds[vehicle_id] = min(35.0, target_speed)
 
         # 2. 协调控制，只和主干道上序号为1的车辆交互
         merging_point = self.merging_zone[1]
