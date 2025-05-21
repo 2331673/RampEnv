@@ -11,13 +11,5 @@ class Executor:
             vehicle_id = id(vehicle)
             if vehicle_id in planned_speeds:
                 target_speed = planned_speeds[vehicle_id]
-                # 最低速度约束
-                if vehicle.lane_index[0] == "a":
-                    min_speed = self.planner.MAINLINE_MIN_SPEED
-                elif vehicle.lane_index[0] == "j":
-                    min_speed = self.planner.RAMP_MIN_SPEED
-                else:
-                    min_speed = 0
-                target_speed = max(min_speed, min(35.0, target_speed))
                 vehicle.target_speed = target_speed
                 actual_speeds[vehicle_id] = vehicle.speed

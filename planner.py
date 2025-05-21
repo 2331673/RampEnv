@@ -11,6 +11,7 @@ class Planner:
         self.merging_zone = (150, 230)
         self.MAINLINE_MIN_SPEED = 50.0/3.6  # 50km/h
         self.RAMP_MIN_SPEED = 20/3.6    # 20km/h
+        self.RAMP_MAX_SPEED = 60/3.6    # 60km/h
 
     def correct_vehicle_state(self, vehicle, env):
         vehicle_id = id(vehicle)
@@ -85,36 +86,46 @@ class Planner:
         else:
             MAIN_A_MAX = 2.0
             MAIN_A_MIN = -2.0
-        for idx in range(min(5, len(mainline_sorted))):
+        for idx in range(len(mainline_sorted)):
             main_vehicle = mainline_sorted[idx]
             main_state = self.correct_vehicle_state(main_vehicle, env)
             ramp_dist = merging_point - ramp_state['position']
             main_dist = merging_point - main_state['position']
             # 预测两车到达汇入点的时间（考虑加速度过程）
-            ramp_time = self.predict_arrival_time(ramp_dist, ramp_state['speed'], self.RAMP_MIN_SPEED, RAMP_A_MAX)   # 匝道加速
+            ramp_time = self.predict_arrival_time(ramp_dist, ramp_state['speed'], self.RAMP_MAX_SPEED, RAMP_A_MAX)   # 匝道加速
             main_time = self.predict_arrival_time(main_dist, main_state['speed'], self.MAINLINE_MIN_SPEED, MAIN_A_MIN)  # 主路减速
-            time_gap = 1.0 if ramp_state['position'] >= self.merging_zone[0] else 1.0
+            time_gap = 1 if ramp_state['position'] >= self.merging_zone[0] else 1
             if (main_time - ramp_time) > time_gap:
-                # 匝道车辆以最大加速度提速，但不超过限速
-                ramp_target_speed = ramp_state['speed'] + RAMP_A_MAX * ramp_time
-                ramp_target_speed = max(self.RAMP_MIN_SPEED, ramp_target_speed)
-                # 主干道车辆以最大减速度减速，但不低于限速
-                main_target_speed = main_state['speed'] + MAIN_A_MIN * main_time
-                main_target_speed = min(self.MAINLINE_MIN_SPEED, main_target_speed)
-                planned_speeds[id(ramp_vehicle)] = ramp_target_speed
-                planned_speeds[id(main_vehicle)] = main_target_speed
+                # # 匝道车辆以最大加速度提速，但不超过限速
+                # ramp_target_speed = ramp_state['speed'] + RAMP_A_MAX * ramp_time
+                # ramp_target_speed = min(self.RAMP_MAX_SPEED, ramp_target_speed)
+                # # 主干道车辆以最大减速度减速，但不低于限速
+                # main_target_speed = main_state['speed'] + MAIN_A_MIN * main_time
+                # main_target_speed = max(self.MAINLINE_MIN_SPEED, main_target_speed)
+                # planned_speeds[id(ramp_vehicle)] = ramp_target_speed
+                # planned_speeds[id(main_vehicle)] = main_target_speed
                 
                 dt = 0.1 # 获取仿真步长，默认0.1s
-                planned_speeds[id(ramp_vehicle)] = ramp_state['speed'] + RAMP_A_MAX * dt
-                planned_speeds[id(main_vehicle)] = main_state['speed'] + MAIN_A_MIN * dt
+                planned_speeds[id(ramp_vehicle)] = min(self.RAMP_MAX_SPEED, ramp_state['speed'] + RAMP_A_MAX * dt)
+                planned_speeds[id(main_vehicle)] = max(self.MAINLINE_MIN_SPEED,main_state['speed'] + MAIN_A_MIN * dt)
                 
                 break
         return planned_speeds
 
     def plan_trajectory(self, merging_sequence, env):
-        # 车辆分组
         mainline_vehicles = [v for v in merging_sequence if v.lane_index[0] in ["a", "b", "c"]]
         ramp_vehicles = [v for v in merging_sequence if v.lane_index[0] in ["j", "k"]]
+
+        # 禁止kb交汇点前主干道车辆变道
+        kb_point = self.merging_zone[1]
+        for vehicle in mainline_vehicles:
+            if hasattr(vehicle, "lane_index") and hasattr(vehicle, "enable_lane_change"):
+                # 只禁止序号为0的车道变道
+                if vehicle.lane_index[2] == 0 and vehicle.position[0] < kb_point:
+                    vehicle.enable_lane_change = False
+                # 不允许序号为1的车道变道
+                elif vehicle.lane_index[2] == 1:
+                    vehicle.enable_lane_change = False
 
         planned_speeds = {}
         dt = 0.1  # 仿真步长
@@ -152,7 +163,7 @@ class Planner:
             [v for v in mainline_vehicles if v.position[0] < merging_point],
             key=lambda v: merging_point - v.position[0]
         )
-        mainline_for_coord = [mainline_sorted[0]] if mainline_sorted else []
+        mainline_for_coord = mainline_sorted if mainline_sorted else []
         coord_speeds = self.coordinate_merge(mainline_for_coord, ramp_vehicles, env)
         planned_speeds.update(coord_speeds)
 

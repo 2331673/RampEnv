@@ -10,17 +10,23 @@ class MergeEnvV1(MergeEnv):
         # 匝道ego车，速度范围30~40km/h
         ego_speed = self.np_random.uniform(28, 35) / 3.6
         ego_vehicle = other_vehicles_type(
-            road, road.network.get_lane(("j", "k", 0)).position(140, 0), speed=ego_speed
+            road, road.network.get_lane(("j", "k", 0)).position(145, 0), speed=ego_speed
         )
         road.vehicles.append(ego_vehicle)
         ego_vehicle.color = (0, 255, 0)
         # 主干道车辆，速度范围70~90km/h
         main_positions = [390, 350, 300,260,220 ,190, 150, 120, 90, 50, 30, 5]  # 可根据需要调整数量和分布
+        i = 0
         for position in main_positions:
-            lane = road.network.get_lane(("a", "b", self.np_random.integers(2)))
+            #如果i是基数，那么lane为0，否则lane为1
+            if i % 2 == 0:
+                lane = road.network.get_lane(("a", "b", 0))
+            else:
+                lane = road.network.get_lane(("a", "b", 1))
             pos = lane.position(position + self.np_random.uniform(-5, 5), 0)
             speed = self.np_random.uniform(65, 75) / 3.6  # 70~90 km/h
             road.vehicles.append(other_vehicles_type(road, pos, speed=speed))
+            i+=1
         self.vehicle = ego_vehicle
 
     def step(self, action):
