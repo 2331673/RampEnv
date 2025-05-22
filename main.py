@@ -4,6 +4,7 @@ from controller import RoadsideController
 import matplotlib.pyplot as plt
 import imageio
 from highway_env.envs.merge_v1 import MergeEnvV1
+import os
 
 def run_simulation():
     env = gymnasium.make(
@@ -31,7 +32,13 @@ def run_simulation():
         }
     )
 
+    video_folder = os.path.join(os.path.dirname(__file__), "videos")
     env.unwrapped.__class__ = MergeEnvV1
+    env = gymnasium.wrappers.RecordVideo(
+        env,
+        video_folder = video_folder,
+        episode_trigger=lambda episode_id: True
+    )
     obs, info = env.reset()
 
     ego_vehicle = env.unwrapped.vehicle
@@ -91,8 +98,8 @@ def run_simulation():
             planned = [v[1] if isinstance(v, tuple) else v for v in history['planned_speeds'][vehicle_id]]
             actual = [v[1] if isinstance(v, tuple) else v for v in history['actual_speeds'][vehicle_id]]
             t = list(range(len(planned)))
-            axes[1].plot(t, planned, '--', label=f"Plan {str(vehicle_id)[:4]}")
-            axes[1].plot(t[:len(actual)], actual, '-', label=f"Act {str(vehicle_id)[:4]}")
+            axes[1].plot(t, planned, '--', label=f"Plan {str(vehicle_id)[-4:]}")
+            axes[1].plot(t[:len(actual)], actual, '-', label=f"Act {str(vehicle_id)[-4:]}")
     axes[1].legend(loc='upper right', fontsize=8)
 
     # 3. 误差分析
@@ -119,6 +126,8 @@ def run_simulation():
     plt.savefig("merge_analysis.png", dpi=300)
     plt.show()
 
+    env.close()
+    
     print(f"Simulation completed with {len(frames)} frames.")
     print(f"Average Speed Error: {avg_speed_error:.2f}%")
     print(f"Average Gap Error: {avg_gap_error:.2f}%")
