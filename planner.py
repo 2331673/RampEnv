@@ -137,7 +137,7 @@ class Planner:
                 speed = vehicle.speed
                 acc_max = min(getattr(vehicle, "ACC_MAX", 2.0), getattr(vehicle, "COMFORT_ACC_MAX", 2.0))
                 acc_min = max(-getattr(vehicle, "ACC_MAX", 2.0), getattr(vehicle, "COMFORT_ACC_MIN", -2.0))
-                if speed < 70/3.6:
+                if speed < 80/3.6:
                     target_speed = speed + acc_max * dt
                 else:
                     target_speed = speed + acc_min * dt
