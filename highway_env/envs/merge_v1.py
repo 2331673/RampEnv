@@ -18,15 +18,15 @@ class MergeEnvV1(MergeEnv):
         main_positions = [390, 350, 300, 260, 220, 190, 150, 120, 90, 50, 30, 5]  # 可根据需要调整数量和分布
         i = 0
         for position in main_positions:
-            # 原有逻辑：如果i是基数，那么lane为0，否则lane为1
-            # if i % 2 == 0:
-            #     lane = road.network.get_lane(("a", "b", 0))
-            # else:
-            #     lane = road.network.get_lane(("a", "b", 1))
-            # 新增：随机选择lane为0或1
-            # 新增：随机选择lane为0或1
-            lane_index = self.np_random.integers(0, 2)
-            lane = road.network.get_lane(("a", "b", lane_index))
+            #原有逻辑：如果i是基数，那么lane为0，否则lane为1
+            if i % 2 == 0:
+                lane = road.network.get_lane(("a", "b", 0))
+            else:
+                lane = road.network.get_lane(("a", "b", 1))
+            ##新增：随机选择lane为0或1
+            ##新增：随机选择lane为0或1
+            # lane_index = self.np_random.integers(0, 2)
+            # lane = road.network.get_lane(("a", "b", lane_index))
             pos = lane.position(position + self.np_random.uniform(-5, 5), 0)
             speed = self.np_random.uniform(65, 75) / 3.6  # 70~90 km/h
             road.vehicles.append(other_vehicles_type(road, pos, speed=speed))
