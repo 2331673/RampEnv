@@ -6,7 +6,7 @@ import imageio
 from highway_env.envs.merge_v1 import MergeEnvV1
 import os
 
-def run_simulation():
+def run_simulation(delay = 0.1):
     env = gymnasium.make(
         "merge-v0",
         render_mode="rgb_array",
@@ -46,7 +46,7 @@ def run_simulation():
     print(f"Ego lane index: {ego_vehicle.lane_index}")
     print(f"Ego position: {ego_vehicle.position}")
 
-    controller = RoadsideController(env)
+    controller = RoadsideController(env, delay)
 
     # 检查车辆
     mainline_vehicles, ramp_vehicles, controller_ego = controller.vehicle_manager.detect_vehicles()
@@ -135,4 +135,4 @@ def run_simulation():
     return controller, frames
 
 if __name__ == "__main__":
-    controller, frames = run_simulation()
+    controller, frames = run_simulation(0.5)
