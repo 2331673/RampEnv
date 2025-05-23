@@ -5,13 +5,13 @@ from executor import Executor
 from history import History
 
 class RoadsideController:
-    def __init__(self, env, communication_delay_mean=0.0, communication_delay_std=0.0):
+    def __init__(self, env, communication_delay_mean=0.1, communication_delay_std=0.0):
         self.env = env.unwrapped
         self.dt = 1.0 / self.env.config["simulation_frequency"]
         self.time_step = 0
 
         # 实例化各功能模块
-        self.delay_model = DelayModel(communication_delay_mean, communication_delay_std)
+        self.delay_model = DelayModel(communication_delay_mean)  # 只传递一个参数
         self.vehicle_manager = VehicleManager(self.env)
         self.planner = Planner(self.delay_model)
         self.executor = Executor(self.env, self.planner, self.vehicle_manager, self.dt, self.planner.merging_zone)
@@ -46,6 +46,8 @@ class RoadsideController:
 
         # 4. 轨迹/速度/间距规划
         self.planned_speeds = self.planner.plan_trajectory(self.merging_sequence, self.env)
+        # 新增：同步历史给executor
+        self.executor.planned_speeds_history = self.planner.planned_speeds_history
 
         # 5. 控制执行
         self.executor.apply_control(self.planned_speeds, self.actual_speeds)

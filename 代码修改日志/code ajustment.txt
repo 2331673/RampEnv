@@ -70,14 +70,45 @@
 
 ---
 
-
-
-
-
-
 规则添加：
 合流区之前的主干道不要有车辆变道
 
 延迟添加：
 将目前的计算结果延迟具体时间推送给车辆（延迟0.1秒，对应推送晚0.1秒）
 同时展示当前计算的结果和车辆实际采用的值（研究是列表前推一格）
+
+### 1. delay_model.py
+- 所有车辆的通信延迟由初始化参数 `comm_delay` 决定，默认为 0.1 秒，不再动态估计。
+- `get_delay(vehicle_id)` 始终返回该固定延迟。
+
+### 2. controller.py
+- `RoadsideController` 初始化时，`DelayModel` 只传递一个参数 `communication_delay_mean`，用于设置所有车辆的固定延迟。
+
+### 3. 其他模块
+- planner.py、`executor.py`、`history.py`、`vehicle_manager.py` 等模块无需更改，继续通过 `delay_model.get_delay(vehicle_id)` 获取延迟即可。
+
+---
+
+【延迟下发规划速度的协调修改思路】
+
+1. 在 planner.py 中，每次 plan_trajectory 规划后，将所有车辆的 planned_speeds 以 {vehicle_id: speed} 的形式，按仿真步顺序追加保存到一个历史列表（如 self.planned_speeds_history，列表每步为一个字典）。
+
+2. 在 executor.py 的 apply_control 方法中，不再直接使用当前步的 planned_speeds，而是：
+   - 对每辆车，先通过 delay_model.get_delay(vehicle_id) 获取该车的延迟（如0.1、0.2、0.3等）。
+   - 计算延迟步数 delay_steps = int(delay / dt)，dt为仿真步长（如0.1s）。
+   - 从 self.planned_speeds_history 中取出 delay_steps 步之前的 planned_speeds 字典，查找该车辆的目标速度（如果历史不足则取最早的可用值或当前值）。
+   - 将该延迟步的目标速度赋值给 vehicle.target_speed，实现“延迟下发”。
+
+3. 保证 planned_speeds_history 的长度与仿真步同步增长，且每步都能回溯到对应历史。
+
+4. 这样每辆车实际采用的目标速度就是“延迟/0.1步前”planner为它规划的速度，能够真实反映通信/执行延迟的影响。
+
+5. 其他模块（如 history 记录、误差分析等）可继续记录当前步的 planned_speeds 和实际速度，便于对比分析。
+
+6. 代码结构建议：
+   - planner.py：增加 self.planned_speeds_history，plan_trajectory 每步追加。
+   - executor.py：apply_control 读取历史 planned_speeds_history，按延迟步数下发。
+   - controller.py：初始化和每步同步 planned_speeds_history。
+   - delay_model.py：延迟仍由 get_delay(vehicle_id) 提供。
+
+【这样实现后，车辆的控制延迟可灵活调整，且每辆车可有不同延迟，仿真更真实。】

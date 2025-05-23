@@ -12,6 +12,7 @@ class Planner:
         self.MAINLINE_MIN_SPEED = 50.0/3.6  # 50km/h
         self.RAMP_MIN_SPEED = 20/3.6    # 20km/h
         self.RAMP_MAX_SPEED = 60/3.6    # 60km/h
+        self.planned_speeds_history = []  # 新增：保存每步的planned_speeds
 
     def correct_vehicle_state(self, vehicle, env):
         vehicle_id = id(vehicle)
@@ -166,5 +167,8 @@ class Planner:
         mainline_for_coord = mainline_sorted if mainline_sorted else []
         coord_speeds = self.coordinate_merge(mainline_for_coord, ramp_vehicles, env)
         planned_speeds.update(coord_speeds)
+
+        # 新增：保存本步的planned_speeds到历史
+        self.planned_speeds_history.append(planned_speeds.copy())
 
         return planned_speeds
