@@ -13,6 +13,7 @@ class Planner:
         self.RAMP_MIN_SPEED = 20/3.6    # 20km/h
         self.RAMP_MAX_SPEED = 60/3.6    # 60km/h
         self.planned_speeds_history = []  # 新增：保存每步的planned_speeds
+        self.coordinated_vehicle_ids = set()  # 新增：记录被协调控制的车辆id
 
     def correct_vehicle_state(self, vehicle, env):
         vehicle_id = id(vehicle)
@@ -97,20 +98,18 @@ class Planner:
             main_time = self.predict_arrival_time(main_dist, main_state['speed'], self.MAINLINE_MIN_SPEED, MAIN_A_MIN)  # 主路减速
             time_gap = 1 if ramp_state['position'] >= self.merging_zone[0] else 1
             if (main_time - ramp_time) > time_gap:
-                # # 匝道车辆以最大加速度提速，但不超过限速
-                # ramp_target_speed = ramp_state['speed'] + RAMP_A_MAX * ramp_time
-                # ramp_target_speed = min(self.RAMP_MAX_SPEED, ramp_target_speed)
-                # # 主干道车辆以最大减速度减速，但不低于限速
-                # main_target_speed = main_state['speed'] + MAIN_A_MIN * main_time
-                # main_target_speed = max(self.MAINLINE_MIN_SPEED, main_target_speed)
-                # planned_speeds[id(ramp_vehicle)] = ramp_target_speed
-                # planned_speeds[id(main_vehicle)] = main_target_speed
-                
                 dt = 0.1 # 获取仿真步长，默认0.1s
                 planned_speeds[id(ramp_vehicle)] = min(self.RAMP_MAX_SPEED, ramp_state['speed'] + RAMP_A_MAX * dt)
-                planned_speeds[id(main_vehicle)] = max(self.MAINLINE_MIN_SPEED,main_state['speed'] + MAIN_A_MIN * dt)
-                
+                planned_speeds[id(main_vehicle)] = max(self.MAINLINE_MIN_SPEED, main_state['speed'] + MAIN_A_MIN * dt)
+                # 协同控制时将被协调主路车辆颜色改为蓝色
+                if hasattr(main_vehicle, "color"):
+                    main_vehicle.color = (0, 0, 255)
+                # 记录被协调车辆id
+                self.coordinated_vehicle_ids.add(id(ramp_vehicle))
+                self.coordinated_vehicle_ids.add(id(main_vehicle))
                 break
+            if hasattr(main_vehicle, "color"):
+                    main_vehicle.color = (128, 128, 128)
         return planned_speeds
 
     def plan_trajectory(self, merging_sequence, env):
@@ -121,10 +120,10 @@ class Planner:
         kb_point = self.merging_zone[1]
         for vehicle in mainline_vehicles:
             if hasattr(vehicle, "lane_index") and hasattr(vehicle, "enable_lane_change"):
-                # 只禁止序号为0的车道变道
+                # 禁止序号为0的车道变道
                 if vehicle.lane_index[2] == 0 and vehicle.position[0] < kb_point:
                     vehicle.enable_lane_change = False
-                # 不允许序号为1的车道变道
+                # 禁止序号为1的车道变道
                 elif vehicle.lane_index[2] == 1:
                     vehicle.enable_lane_change = False
 
@@ -160,8 +159,12 @@ class Planner:
 
         # 2. 协调控制，只和主干道上序号为1的车辆交互
         merging_point = self.merging_zone[1]
+        # mainline_sorted = sorted(
+        #     [v for v in mainline_vehicles if v.position[0] < merging_point],
+        #     key=lambda v: merging_point - v.position[0]
+        # )
         mainline_sorted = sorted(
-            [v for v in mainline_vehicles if v.position[0] < merging_point],
+            [v for v in mainline_vehicles if v.position[0] < merging_point and v.lane_index[2] == 1],
             key=lambda v: merging_point - v.position[0]
         )
         mainline_for_coord = mainline_sorted if mainline_sorted else []

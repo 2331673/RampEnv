@@ -55,7 +55,7 @@ def run_simulation(delay = 0.1):
 
     frames = []   
     
-    fig, axes = plt.subplots(3, 1, figsize=(12, 12))
+    fig, axes = plt.subplots(4, 1, figsize=(12, 16))
 
     for step in range(400):
         controller.update()
@@ -89,31 +89,76 @@ def run_simulation(delay = 0.1):
         axes[0].imshow(frames[-1])
 
     # 2. 速度对比
-    axes[1].set_title("Speed Comparison (Target vs Actual)")
+    axes[1].set_title("Speed Comparison (Actual vs Delayed Planned)")
     axes[1].set_xlabel("Time Step")
     axes[1].set_ylabel("Speed (m/s)")
     history = controller.history.history
-    for vehicle_id in history['planned_speeds']:
-        if vehicle_id in history['actual_speeds']:
-            planned = [v[1] if isinstance(v, tuple) else v for v in history['planned_speeds'][vehicle_id]]
-            actual = [v[1] if isinstance(v, tuple) else v for v in history['actual_speeds'][vehicle_id]]
-            t = list(range(len(planned)))
-            axes[1].plot(t, planned, '--', label=f"Plan {str(vehicle_id)[-4:]}")
-            axes[1].plot(t[:len(actual)], actual, '-', label=f"Act {str(vehicle_id)[-4:]}")
+
+    # 新增：第三个子图，展示规划速度和延迟规划速度
+    axes[2].set_title("Planned Speed vs Delayed Planned Speed")
+    axes[2].set_xlabel("Time Step")
+    axes[2].set_ylabel("Speed (m/s)")
+
+    dt = controller.dt
+    planned_speeds_history = controller.planner.planned_speeds_history
+
+    coordinated_ids = controller.planner.coordinated_vehicle_ids
+
+    for vehicle_id in history['actual_speeds']:
+        if vehicle_id not in coordinated_ids:
+            continue  # 只画被协调控制过的车辆
+
+        # 真实速度
+        actual = [v[1] if isinstance(v, tuple) else v for v in history['actual_speeds'][vehicle_id]]
+        t_actual = list(range(len(actual)))
+
+        # 规划速度
+        planned = history['planned_speeds'].get(vehicle_id, [])
+        planned_vals = [v[1] if isinstance(v, tuple) else v for v in planned]
+        t_planned = list(range(len(planned_vals)))
+
+        # 延迟规划速度
+        delay = controller.delay_model.get_delay(vehicle_id)
+        delay_steps = int(delay / dt)
+        delayed_planned = []
+        for i in range(len(actual)):
+            idx = i - delay_steps
+            if idx >= 0 and idx < len(planned_vals):
+                delayed_planned.append(planned_vals[idx])
+            else:
+                delayed_planned.append(None)
+
+        # 绘制实际速度和延迟规划速度
+        axes[1].plot(t_actual, actual, '-', label=f"Actual {vehicle_id % 10000}")
+        axes[1].plot(
+            [i for i, v in enumerate(delayed_planned) if v is not None],
+            [v for v in delayed_planned if v is not None],
+            '--', label=f"DelayedPlan {vehicle_id % 10000}"
+        )
+
+        # 绘制规划速度和延迟规划速度
+        axes[2].plot(t_planned, planned_vals, '-', label=f"Planned {vehicle_id % 10000}")
+        axes[2].plot(
+            [i for i, v in enumerate(delayed_planned) if v is not None],
+            [v for v in delayed_planned if v is not None],
+            '--', label=f"DelayedPlan {vehicle_id % 10000}"
+        )
+
     axes[1].legend(loc='upper right', fontsize=8)
+    axes[2].legend(loc='upper right', fontsize=8)
 
     # 3. 误差分析
-    axes[2].set_title("Error Analysis")
-    axes[2].set_xlabel("Time Step")
-    axes[2].set_ylabel("Error Rate (%)")
+    axes[3].set_title("Error Analysis")
+    axes[3].set_xlabel("Time Step")
+    axes[3].set_ylabel("Error Rate (%)")
     speed_errors = [e[1] * 100 if isinstance(e, tuple) else e * 100 for e in history['speed_errors']]
     gap_errors = [e[1] * 100 if isinstance(e, tuple) else e * 100 for e in history['gap_errors']]
     time = list(range(len(speed_errors)))
     min_len = min(len(time), len(speed_errors), len(gap_errors))
-    axes[2].plot(time[:min_len], speed_errors[:min_len], 'r-', label="Speed Error (%)")
-    axes[2].plot(time[:min_len], gap_errors[:min_len], 'b-', label="Gap Error (%)")
-    axes[2].axhline(y=15, color='r', linestyle='--', label="15% Threshold")
-    axes[2].legend(loc='upper right')
+    axes[3].plot(time[:min_len], speed_errors[:min_len], 'r-', label="Speed Error (%)")
+    axes[3].plot(time[:min_len], gap_errors[:min_len], 'b-', label="Gap Error (%)")
+    axes[3].axhline(y=15, color='r', linestyle='--', label="15% Threshold")
+    axes[3].legend(loc='upper right')
 
     # 显示平均误差
     avg_speed_error, avg_gap_error = controller.history.get_average_errors()
@@ -135,4 +180,4 @@ def run_simulation(delay = 0.1):
     return controller, frames
 
 if __name__ == "__main__":
-    controller, frames = run_simulation(0.5)
+    controller, frames = run_simulation(0.1)
