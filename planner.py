@@ -13,6 +13,7 @@ class Planner:
         self.RAMP_MIN_SPEED = 20/3.6    # 20km/h
         self.RAMP_MAX_SPEED = 60/3.6    # 60km/h
         self.planned_speeds_history = []  # 新增：保存每步的planned_speeds
+        self.planned_gaps_history = {}
         self.coordinated_vehicle_ids = set()  # 新增：记录被协调控制的车辆id
 
     def correct_vehicle_state(self, vehicle, env):
@@ -154,8 +155,27 @@ class Planner:
 
             else:
                 target_speed = 30.0
-
+            
             planned_speeds[vehicle_id] = min(35.0, target_speed)
+
+        for i in range(len(merging_sequence) - 1):
+            v1 = merging_sequence[i]
+            for j in range(i + 1, len(merging_sequence)):
+                v2 = merging_sequence[j]
+                # Only calculate gaps for vehicles in the same lane
+                if v1.lane_index[0] == v2.lane_index[0] and v1.lane_index[2] == v2.lane_index[2]:
+                    # Calculate the planned gap based on their planned speeds
+                    gap = abs(v1.position[0] - v2.position[0])
+                    if gap < 100:  # Only record gaps smaller than 100m
+                        pair_key = (id(v1), id(v2))
+                        self.planned_gaps_history[pair_key] = gap
+                    break  # Only consider the closest following vehicle
+        
+            # New: Save the planned gaps to history
+        if not hasattr(self, 'planned_gaps_history_list'):
+            self.planned_gaps_history_list = []
+        self.planned_gaps_history_list.append(self.planned_gaps_history.copy())
+            
 
         # 2. 协调控制，只和主干道上序号为1的车辆交互
         merging_point = self.merging_zone[1]

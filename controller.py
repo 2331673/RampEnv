@@ -51,13 +51,14 @@ class RoadsideController:
 
         # 5. 控制执行
         self.executor.apply_control(self.planned_speeds, self.actual_speeds)
+        self.actual_gaps = getattr(self.executor, 'actual_gaps', {})
 
         # 6. 历史记录与误差分析
         self.history.record(
             current_time,
             self.planned_speeds,
             self.actual_speeds,
-            self.planned_gaps,
+            self.planner.planned_gaps_history,
             self.actual_gaps
         )
 
